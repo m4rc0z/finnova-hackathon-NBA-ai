@@ -51,7 +51,11 @@ total_balance_chf, avg_balance_chf, min_balance_chf, max_balance_chf,
 has_negative_balance, total_spent_chf, total_income_chf,
 num_transactions, unique_categories, top_spend_category,
 num_interactions, num_open_interactions, preferred_channel, stress,
-canton, is_deceased, ...`
+canton, is_deceased, ...` plus a `product_inventory` dict:
+`{"product_names": [...], "kinds": [...], "account_count", "has_pillar3a",
+"has_savings", "has_mortgage", "has_investment"}` - use
+`product_inventory.product_names` for exact duplicate-product checks
+(more reliable than the individual `has_*` flags alone).
 
 These are already aggregated across the customer's accounts/transactions -
 do not resum raw historical balances yourself; use `total_balance_chf`
@@ -65,14 +69,38 @@ do not resum raw historical balances yourself; use `total_balance_chf`
   "individual_id": "CUSTOMER_ID",
   "recommendations": [
     {"action": "retirement_planning", "score": 75, "reasons": ["..."]}
+  ],
+  "product_suggestions": [
+    {"action": "retirement_planning", "product_name": "Freizügigkeitskonto", "score": 75, "reasons": ["..."]}
   ]
 }
 ```
 `{"detail": "Individual not found"}` for unknown customers. `action` is
 one of: `offer_savings_account`, `offer_pillar3a`, `offer_mortgage`,
 `offer_investment`, `retention_call`, `upsell_premium`, `financial_advice`,
-`retirement_planning`. Recommendations are already sorted by score
-(highest first); pick the top 1-3 and cite their `reasons`.
+`retirement_planning`. Both lists are already sorted by score (highest
+first). Use `product_suggestions` to attach a concrete `product_name` to
+each chosen action (fall back to the product catalog table above if an
+action has no matching entry); pick the top 1-3 recommendations and cite
+their `reasons`. `product_suggestions` can list actions the customer
+already owns a matching product for (e.g. a low-score
+`offer_savings_account` even when `has_savings` is true) - always
+cross-check against `product_inventory`/`has_*` before accepting a
+suggestion, per the compliance rules below.
+
+## ML model status
+
+A logistic-regression model was trained offline as a baseline but is
+**not** exposed via an API yet. Do not call `/api/v1/individuals/{id}/ml-recommendations`
+- it does not exist yet. The current `/recommendations` endpoint always
+uses the explainable, rule-based scoring above, not the ML model.
+
+Training stats show the model is not production-ready: 64,368 examples
+but only 3 positive labels (test set: 0 positives, conversion rate 0.0,
+top-10 precision 0.0) - too few customers have a complete follow-up
+window with a matching event/transaction in the next 7 periods. Mention
+this limitation if asked about ML-based scoring, and rely only on the
+rule-based recommendations for now.
 
 ## Raw collections (for supplementary evidence only)
 
@@ -103,13 +131,13 @@ first if you only have an `account_id`, to find its `individual_id`.
 ## Compliance rules the agent must apply
 
 - **No duplicate products**: never propose a product the customer already
-  holds. Check `has_savings`/`has_checking`/`has_pillar3a`/`unique_products`
-  as a first signal, then confirm against the exact `accounts.product_name`
-  values from the product catalog above (e.g. don't suggest
+  holds. Check `features.product_inventory.product_names` (exact match)
+  and `has_savings`/`has_checking`/`has_pillar3a` as a first signal, then
+  confirm against the product catalog above (e.g. don't suggest
   `offer_pillar3a` if the customer already has any of "Säule 3a-Konto",
-  "Säule 3a Fondssparplan" or "Lebensversicherung 3a") before suggesting
-  `offer_savings_account`, `offer_pillar3a`, `offer_investment` or
-  `offer_mortgage`.
+  "Säule 3a Fondssparplan" or "Lebensversicherung 3a") before accepting a
+  `product_suggestions` entry or proposing `offer_savings_account`,
+  `offer_pillar3a`, `offer_investment` or `offer_mortgage`.
 - **Jugendschutz (minors, age < 18)**: minors have limited legal capacity
   and need parental/legal-guardian consent for binding financial products.
   Only youth-appropriate actions are allowed (e.g. a youth savings account

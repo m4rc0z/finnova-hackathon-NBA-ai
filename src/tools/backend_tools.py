@@ -22,7 +22,9 @@ def get_customer_features(individual_id: str) -> dict:
     marital_status, num_accounts, has_savings, has_pillar3a,
     total_balance_chf, has_negative_balance, total_spent_chf,
     total_income_chf, num_transactions, top_spend_category,
-    num_interactions, num_open_interactions, stress, ...).
+    num_interactions, num_open_interactions, stress, ...), including a
+    "product_inventory" dict with the exact product_names/kinds the
+    customer already owns - use it for precise duplicate-product checks.
 
     Returns {"detail": "Individual not found"} if the individual_id is unknown.
     """
@@ -31,10 +33,16 @@ def get_customer_features(individual_id: str) -> dict:
 
 @tool
 def get_recommendations(individual_id: str) -> dict:
-    """Get scored next-best-action recommendations for a customer.
+    """Get scored next-best-action recommendations for a customer, produced
+    by the backend's explainable rule-based scoring (not the offline ML
+    model - see skill doc for the ML model's current status).
 
-    Returns {"individual_id", "recommendations": [{"action", "score", "reasons"}]}
-    sorted by relevance, or {"detail": "Individual not found"} if unknown.
+    Returns {"individual_id",
+    "recommendations": [{"action", "score", "reasons"}],
+    "product_suggestions": [{"action", "product_name", "score", "reasons"}]}
+    both sorted by score, or {"detail": "Individual not found"} if unknown.
+    Use product_suggestions to map a recommended action to a concrete
+    product_name.
     """
     return _client.get_recommendations(individual_id)
 
