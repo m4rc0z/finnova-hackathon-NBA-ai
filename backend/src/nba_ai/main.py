@@ -1,4 +1,4 @@
-"""FastAPI Application - HTTP API for agent runtime."""
+"""FastAPI application for the agent runtime."""
 
 import logging
 from typing import Any
@@ -6,7 +6,6 @@ from typing import Any
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
-# Import agents to register them
 import nba_ai.agents  # noqa: F401
 from nba_ai.config import get_settings
 from nba_ai.services.agent_orchestrator import (
@@ -17,7 +16,7 @@ from nba_ai.services.agent_runtime import AgentRunError, run_agent
 
 logger = logging.getLogger(__name__)
 
-# Pydantic models for API
+
 class AgentRunRequest(BaseModel):
     """Request to run an agent."""
 
@@ -38,7 +37,6 @@ class HealthResponse(BaseModel):
     version: str = Field(default="0.1.0", description="Service version")
 
 
-# Create FastAPI app
 app = FastAPI(
     title="NBA AI Backend",
     description="Minimal Python Agent Runtime for Next Best Action Studio",
@@ -60,19 +58,7 @@ async def available_agents() -> dict[str, list[str]]:
 
 @app.post("/api/agents/{agent_name}/run")
 def run_agent_endpoint(agent_name: str, request: AgentRunRequest) -> Any:
-    """
-    Run a named agent with the given input.
-
-    Args:
-        agent_name: Name of the agent (e.g., "nba_creator")
-        request: Agent run request with input text
-
-    Returns:
-        Agent's structured output
-
-    Raises:
-        HTTPException: If agent not found or execution fails
-    """
+    """Run a named agent with the given input."""
     settings = get_settings()
 
     try:
@@ -82,12 +68,12 @@ def run_agent_endpoint(agent_name: str, request: AgentRunRequest) -> Any:
             settings=settings,
         )
         return {"output": result}
-    except AgentRunError as e:
-        logger.warning(f"Agent run failed: {str(e)}")
-        raise HTTPException(status_code=400, detail=str(e)) from e
-    except Exception as e:
-        logger.error(f"Unexpected error: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Internal server error") from e
+    except AgentRunError as exc:
+        logger.warning("Agent run failed: %s", exc)
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.error("Unexpected error: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error") from exc
 
 
 @app.post("/api/orchestrator/run")
@@ -102,9 +88,9 @@ def orchestrator_run_endpoint(request: OrchestratorRunRequest) -> Any:
             settings=settings,
         )
         return {"agent_name": request.agent_name, "output": result}
-    except AgentRunError as e:
-        logger.warning(f"Orchestrator run failed: {str(e)}")
-        raise HTTPException(status_code=400, detail=str(e)) from e
-    except Exception as e:
-        logger.error(f"Unexpected orchestrator error: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Internal server error") from e
+    except AgentRunError as exc:
+        logger.warning("Orchestrator run failed: %s", exc)
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.error("Unexpected orchestrator error: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error") from exc

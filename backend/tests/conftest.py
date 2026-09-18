@@ -6,7 +6,7 @@ import pytest
 
 
 @pytest.fixture(autouse=True)
-def setup_test_env(monkeypatch):
+def setup_test_env(monkeypatch: pytest.MonkeyPatch) -> None:
     """Set up test environment variables."""
     monkeypatch.setenv(
         "SWISSCOM_API_KEY",

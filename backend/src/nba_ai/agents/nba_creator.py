@@ -7,16 +7,8 @@ from nba_ai.tools.client_attrs import get_available_client_attributes
 
 
 def create_nba_creator_agent() -> Agent:
-    """
-    Create the NBA Creator Agent.
-
-    This agent demonstrates:
-    - Instructions
-    - Structured output (NBAProposal)
-    - Function tool calling (get_available_client_attributes)
-    """
-
-    agent = Agent(
+    """Create the NBA Creator Agent."""
+    return Agent(
         name="nba_creator",
         instructions="""You are an expert in Next Best Action recommendations for financial services.
 Use get_available_client_attributes before making a recommendation when tool calling is available.
@@ -27,5 +19,3 @@ When tool data is available, use its actual values and available products in the
         model_settings=ModelSettings(tool_choice="auto"),
         output_type=NBAProposal,
     )
-
-    return agent

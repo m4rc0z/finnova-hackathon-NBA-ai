@@ -2,7 +2,6 @@
 
 from typing import Any, Callable
 
-# Registry: agent_name -> agent_factory
 _agent_registry: dict[str, Callable[..., Any]] = {}
 
 

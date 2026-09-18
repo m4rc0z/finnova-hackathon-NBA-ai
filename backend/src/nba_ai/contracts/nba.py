@@ -1,3 +1,5 @@
+"""NBA response contracts."""
+
 from pydantic import BaseModel, Field
 
 

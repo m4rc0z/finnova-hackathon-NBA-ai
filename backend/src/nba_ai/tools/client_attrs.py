@@ -1,4 +1,4 @@
-"""Example tool: get_available_client_attributes()"""
+"""Example tool for retrieving deterministic client attributes."""
 
 from typing import Any
 
@@ -6,12 +6,7 @@ from agents.tool import function_tool
 
 
 def get_available_client_attributes_data() -> dict[str, Any]:
-    """
-    Return deterministic client attributes used by the example capability.
-
-    In a real system, this data would come from a business capability or data
-    source instead of this static proof-of-concept payload.
-    """
+    """Return deterministic client attributes used by the example capability."""
     return {
         "client_id": "client_123",
         "name": "Acme Corp",

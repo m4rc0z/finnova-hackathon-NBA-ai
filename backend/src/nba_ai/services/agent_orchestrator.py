@@ -21,12 +21,7 @@ def run_orchestrated_agent(
     settings: Settings,
     context: dict[str, Any] | None = None,
 ) -> Any:
-    """
-    Validate and delegate a run to a registered agent.
-
-    This is intentionally deterministic. It does not generate agent code,
-    implement a supervisor loop, or add handoffs.
-    """
+    """Validate and delegate a run to a registered agent."""
     if agent_name not in list_agents():
         msg = f"Agent '{agent_name}' is not available to the orchestrator"
         logger.warning(msg)
