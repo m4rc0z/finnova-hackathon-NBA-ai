@@ -1,0 +1,9 @@
+.env
+.env.*
+!.env.example
+
+.openclaw/
+node_modules/
+
+.idea/
+.DS_Store
