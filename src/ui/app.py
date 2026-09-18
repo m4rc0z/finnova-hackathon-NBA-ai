@@ -179,6 +179,55 @@ def render_sidebar():
     return service, provider, backend_url
 
 
+def render_individual_card(service: NBAService, provider: str, ind: dict, key_prefix: str):
+    """Render one individual as an Alpha-style insight card, with a
+    'Create action →' link that triggers evaluation and opens the detail view."""
+    ind_id = ind["individual_id"]
+    cached_nba = service.get_cached_nba(ind_id)
+    feedback = service.get_feedback(ind_id)
+
+    with st.container(border=True):
+        icon_col, badge_col = st.columns([1, 1])
+        icon_col.markdown(_nav_icon("insights", 20), unsafe_allow_html=True)
+        badge_text = "opportunity" if cached_nba else "pending"
+        badge_col.markdown(
+            f'<div style="text-align:right"><span class="alpha-badge">{badge_text}</span></div>',
+            unsafe_allow_html=True,
+        )
+
+        st.markdown(
+            f'<span class="alpha-eyebrow">{ind_id[:13]}… · {ind.get("age") or "-"}y · {ind.get("canton") or "-"}</span>',
+            unsafe_allow_html=True,
+        )
+        title = cached_nba.get("recommended_action") if cached_nba else "Not yet evaluated"
+        st.markdown(f"**{title}**")
+        description = (
+            cached_nba.get("reasoning")
+            if cached_nba
+            else "Click Create action to run the NBA agent for this individual."
+        )
+        st.caption(description[:160] + ("…" if len(description) > 160 else ""))
+
+        st.markdown("---")
+        if cached_nba:
+            useful_col, dismiss_col = st.columns(2)
+            if useful_col.button("✓ Useful", key=f"{key_prefix}_useful", type="primary" if feedback == "useful" else "secondary"):
+                service.record_feedback(ind_id, "useful")
+                st.rerun()
+            if dismiss_col.button("Dismiss", key=f"{key_prefix}_dismiss", type="primary" if feedback == "dismissed" else "secondary"):
+                service.record_feedback(ind_id, "dismissed")
+                st.rerun()
+        if st.button("Create action →", key=f"{key_prefix}_create"):
+            st.session_state.selected_individual_id = ind_id
+            if not cached_nba:
+                with st.spinner("Evaluating Next Best Action..."):
+                    try:
+                        service.evaluate_nba(ind_id, provider=provider, force_refresh=False)
+                    except Exception as e:
+                        st.error(f"Evaluation failed: {e}")
+            st.rerun()
+
+
 def render_portfolio_view(service: NBAService, provider: str, backend_url: str):
     st.markdown('<div class="alpha-eyebrow">FROM DATA TO DIALOGUE</div>', unsafe_allow_html=True)
     st.subheader("📋 Individuals Portfolio & Next Best Actions")
@@ -200,119 +249,111 @@ def render_portfolio_view(service: NBAService, provider: str, backend_url: str):
         st.warning("No individuals found in the backend.")
         return
 
-    # Prepare DataFrame
-    table_data = []
-    for ind in individuals:
-        ind_id = ind["individual_id"]
-        cached_nba = service.get_cached_nba(ind_id)
-        action_text = cached_nba.get("recommended_action", "Not Evaluated") if cached_nba else "Not Evaluated"
-        confidence_val = cached_nba.get("confidence") if cached_nba else None
-
-        table_data.append({
-            "Individual ID": ind_id,
-            "Age": ind.get("age") or "-",
-            "Canton": ind.get("canton") or "-",
-            "Income (CHF)": f"{ind.get('income_chf'):,}" if ind.get("income_chf") is not None else "-",
-            "Employment": ind.get("employment") or "-",
-            "Risk Appetite": ind.get("risk_appetite") or "-",
-            "Next Best Action": action_text,
-            "Confidence": format_confidence(confidence_val),
-        })
-
-    df = pd.DataFrame(table_data)
-
     total_col, eval_col, pending_col = st.columns(3)
     total_col.metric("Total Individuals Loaded", len(individuals))
     evaluated_count = sum(1 for ind in individuals if service.is_evaluated(ind["individual_id"]))
     eval_col.metric("Evaluated Next Best Actions", evaluated_count)
     pending_col.metric("Pending Evaluations", len(individuals) - evaluated_count)
 
-    st.dataframe(df, use_container_width=True, hide_index=True)
+    st.markdown("---")
+
+    display_limit = st.session_state.get("portfolio_display_limit", 9)
+    visible_individuals = individuals[:display_limit]
+    for row_start in range(0, len(visible_individuals), 3):
+        row = visible_individuals[row_start : row_start + 3]
+        cols = st.columns(3)
+        for col, ind in zip(cols, row):
+            with col:
+                render_individual_card(service, provider, ind, key_prefix=f"card_{ind['individual_id']}")
+
+    if display_limit < len(individuals):
+        if st.button(f"Show more individuals ({len(individuals) - display_limit} remaining)"):
+            st.session_state.portfolio_display_limit = display_limit + 9
+            st.rerun()
 
     st.markdown("---")
     st.subheader("🔍 Individual Deep-Dive & Evaluation")
 
-    individual_options = [ind["individual_id"] for ind in individuals]
-    selected_id = st.selectbox("Select Individual ID for evaluation & details:", individual_options)
+    selected_id = st.session_state.get("selected_individual_id")
+    if not selected_id:
+        st.info("Click **Create action →** on a card above to evaluate an individual and see full details here.")
+        return
 
-    if selected_id:
-        trigger_col, status_col = st.columns([2, 1])
-        with trigger_col:
-            button_label = "🔄 Re-evaluate Next Best Action" if service.is_evaluated(selected_id) else "🚀 Evaluate Next Best Action"
-            if st.button(button_label, key="eval_btn", type="primary"):
-                with st.spinner(f"Evaluating Next Best Action for individual {selected_id}..."):
-                    try:
-                        service.evaluate_nba(selected_id, provider=provider, force_refresh=True)
-                    except Exception as e:
-                        st.error(f"Evaluation failed: {e}")
-        with status_col:
-            if service.is_evaluated(selected_id):
-                st.caption("Status: Evaluated & cached")
+    reeval_col, status_col = st.columns([2, 1])
+    with reeval_col:
+        if st.button("🔄 Re-evaluate Next Best Action", key="reeval_btn"):
+            with st.spinner(f"Evaluating Next Best Action for individual {selected_id}..."):
+                try:
+                    service.evaluate_nba(selected_id, provider=provider, force_refresh=True)
+                except Exception as e:
+                    st.error(f"Evaluation failed: {e}")
+    with status_col:
+        if service.is_evaluated(selected_id):
+            st.caption("Status: Evaluated & cached")
 
-        # Display NBA Result Card if available, styled like the source app's insight cards
-        cached_nba = service.get_cached_nba(selected_id)
-        if cached_nba:
-            with st.container(border=True):
-                badge_col, id_col, confidence_col = st.columns([1, 3, 1])
-                badge_col.markdown('<span class="alpha-badge">opportunity</span>', unsafe_allow_html=True)
-                id_col.markdown(f'<span class="alpha-eyebrow">{selected_id}</span>', unsafe_allow_html=True)
-                confidence_score = cached_nba.get("confidence")
-                if confidence_score is not None:
-                    confidence_col.metric("Confidence", format_confidence(confidence_score))
+    # Display NBA Result Card if available, styled like the source app's insight cards
+    cached_nba = service.get_cached_nba(selected_id)
+    if cached_nba:
+        with st.container(border=True):
+            badge_col, id_col, confidence_col = st.columns([1, 3, 1])
+            badge_col.markdown('<span class="alpha-badge">opportunity</span>', unsafe_allow_html=True)
+            id_col.markdown(f'<span class="alpha-eyebrow">{selected_id}</span>', unsafe_allow_html=True)
+            confidence_score = cached_nba.get("confidence")
+            if confidence_score is not None:
+                confidence_col.metric("Confidence", format_confidence(confidence_score))
 
-                st.markdown(f"### {cached_nba.get('recommended_action', 'N/A')}")
-                st.markdown("---")
-                st.markdown(f"**Suggested next step**  \n{cached_nba.get('reasoning', 'No reasoning provided.')}")
-                if "raw_response" in cached_nba:
-                    with st.expander("Why am I seeing this?"):
-                        st.text_area("Agent Response", cached_nba["raw_response"], height=100)
+            st.markdown(f"### {cached_nba.get('recommended_action', 'N/A')}")
+            st.markdown("---")
+            st.markdown(f"**Suggested next step**  \n{cached_nba.get('reasoning', 'No reasoning provided.')}")
+            if "raw_response" in cached_nba:
+                with st.expander("Why am I seeing this?"):
+                    st.text_area("Agent Response", cached_nba["raw_response"], height=100)
 
-                st.markdown("---")
-                feedback = service.get_feedback(selected_id)
-                fb_useful_col, fb_dismiss_col, fb_label_col = st.columns([1, 1, 3])
-                if fb_useful_col.button("✓ Useful", key=f"fb_useful_{selected_id}", type="primary" if feedback == "useful" else "secondary"):
-                    service.record_feedback(selected_id, "useful")
-                    st.rerun()
-                if fb_dismiss_col.button("Dismiss", key=f"fb_dismiss_{selected_id}", type="primary" if feedback == "dismissed" else "secondary"):
-                    service.record_feedback(selected_id, "dismissed")
-                    st.rerun()
-                if feedback == "useful":
-                    fb_label_col.markdown('<span class="alpha-feedback-badge useful">✓ Marked useful</span>', unsafe_allow_html=True)
-                elif feedback == "dismissed":
-                    fb_label_col.markdown('<span class="alpha-feedback-badge dismissed">✕ Dismissed</span>', unsafe_allow_html=True)
-                else:
-                    fb_label_col.caption("Feedback: not rated yet")
+            st.markdown("---")
+            feedback = service.get_feedback(selected_id)
+            fb_useful_col, fb_dismiss_col, fb_label_col = st.columns([1, 1, 3])
+            if fb_useful_col.button("✓ Useful", key=f"fb_useful_{selected_id}", type="primary" if feedback == "useful" else "secondary"):
+                service.record_feedback(selected_id, "useful")
+                st.rerun()
+            if fb_dismiss_col.button("Dismiss", key=f"fb_dismiss_{selected_id}", type="primary" if feedback == "dismissed" else "secondary"):
+                service.record_feedback(selected_id, "dismissed")
+                st.rerun()
+            if feedback == "useful":
+                fb_label_col.markdown('<span class="alpha-feedback-badge useful">✓ Marked useful</span>', unsafe_allow_html=True)
+            elif feedback == "dismissed":
+                fb_label_col.markdown('<span class="alpha-feedback-badge dismissed">✕ Dismissed</span>', unsafe_allow_html=True)
+            else:
+                fb_label_col.caption("Feedback: not rated yet")
 
+    # Context Details (Individual State, Accounts, Balances, Advisor Interactions)
+    with st.expander("📊 View Individual Data (State, Accounts, Interactions)", expanded=False):
+        with st.spinner("Fetching full individual context..."):
+            ctx = service.get_individual_context(selected_id)
 
-        # Context Details (Individual State, Accounts, Balances, Advisor Interactions)
-        with st.expander("📊 View Individual Data (State, Accounts, Interactions)", expanded=False):
-            with st.spinner("Fetching full individual context..."):
-                ctx = service.get_individual_context(selected_id)
+        tab_state, tab_accounts, tab_interactions = st.tabs(
+            ["Individual & State", "Accounts & Account Balances", "Advisor Interactions"]
+        )
 
-            tab_state, tab_accounts, tab_interactions = st.tabs(
-                ["Individual & State", "Accounts & Account Balances", "Advisor Interactions"]
-            )
+        with tab_state:
+            ind_col, state_col = st.columns(2)
+            with ind_col:
+                st.write("**Individual Record:**", ctx.get("individual", {}))
+            with state_col:
+                st.write("**Individual State Attributes:**", ctx.get("individual_state", {}))
 
-            with tab_state:
-                ind_col, state_col = st.columns(2)
-                with ind_col:
-                    st.write("**Individual Record:**", ctx.get("individual", {}))
-                with state_col:
-                    st.write("**Individual State Attributes:**", ctx.get("individual_state", {}))
+        with tab_accounts:
+            accounts = ctx.get("accounts", [])
+            if accounts:
+                st.dataframe(pd.DataFrame(accounts), use_container_width=True, hide_index=True)
+            else:
+                st.write("No accounts found.")
 
-            with tab_accounts:
-                accounts = ctx.get("accounts", [])
-                if accounts:
-                    st.dataframe(pd.DataFrame(accounts), use_container_width=True, hide_index=True)
-                else:
-                    st.write("No accounts found.")
-
-            with tab_interactions:
-                interactions = ctx.get("advisor_interactions", [])
-                if interactions:
-                    st.dataframe(pd.DataFrame(interactions), use_container_width=True, hide_index=True)
-                else:
-                    st.write("No advisor interactions recorded.")
+        with tab_interactions:
+            interactions = ctx.get("advisor_interactions", [])
+            if interactions:
+                st.dataframe(pd.DataFrame(interactions), use_container_width=True, hide_index=True)
+            else:
+                st.write("No advisor interactions recorded.")
 
 
 def render_chat_view(service: NBAService, provider: str):
