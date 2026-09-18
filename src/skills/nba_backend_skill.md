@@ -1,18 +1,65 @@
 # Skill: Finnova NBA Hackathon Backend
 
 Knowledge of the hackathon backend API used to gather customer context for
-Next Best Action (NBA) evaluation. Use the `list_collection` / `get_item`
-tools (see `src/tools/backend_tools.py`) instead of calling the HTTP API
-directly.
+Next Best Action (NBA) evaluation. Use the tools in
+`src/tools/backend_tools.py` instead of calling the HTTP API directly.
 
 ## Base URL
 
 `BACKEND_BASE_URL` env var, defaults to `http://localhost:8000`. No
-authentication is required.
+authentication is required. All endpoints can be slow or briefly
+unreachable; the client handles timeouts/HTTP errors and returns an
+`{"error": ...}` dict instead of raising.
 
-## Collections
+## Status endpoints
 
-One of: `accounts`, `account-balances`, `employers`, `events`,
+- `GET /health`, `GET /api/status` → `{"status": "ok", "data": "loaded"|"loading"}`
+
+## Customer features (preferred for analysis)
+
+`GET /api/v1/individuals/{individual_id}/features` →
+`{"detail": "Individual not found"}` for unknown customers, otherwise a
+flat dict including at least:
+
+`individual_id, age, income_chf, employment, marital_status, num_accounts,
+has_savings, has_checking, has_pillar3a, unique_products,
+total_balance_chf, avg_balance_chf, min_balance_chf, max_balance_chf,
+has_negative_balance, total_spent_chf, total_income_chf,
+num_transactions, unique_categories, top_spend_category,
+num_interactions, num_open_interactions, preferred_channel, stress,
+canton, is_deceased, ...`
+
+These are already aggregated across the customer's accounts/transactions -
+do not resum raw historical balances yourself; use `total_balance_chf`
+(latest balance per account, summed) as the current balance.
+
+## Recommendations (preferred for NBA)
+
+`GET /api/v1/individuals/{individual_id}/recommendations` →
+```json
+{
+  "individual_id": "CUSTOMER_ID",
+  "recommendations": [
+    {"action": "retirement_planning", "score": 75, "reasons": ["..."]}
+  ]
+}
+```
+`{"detail": "Individual not found"}` for unknown customers. `action` is
+one of: `offer_savings_account`, `offer_pillar3a`, `offer_mortgage`,
+`offer_investment`, `retention_call`, `upsell_premium`, `financial_advice`,
+`retirement_planning`. Recommendations are already sorted by score
+(highest first); pick the top 1-3 and cite their `reasons`.
+
+## Raw collections (for supplementary evidence only)
+
+`GET /api/v1/{collection}?limit=&offset=&run_id=&period=&individual_id=&account_id=`
+→ `{"collection", "total", "offset", "limit", "items": [...]}`
+
+`GET /api/v1/{collection}/{item_id}?run_id=` → a single item, or
+`{"items": [...]}` if multiple periods match (e.g. account-balances over
+time - these are historical snapshots, never sum them as a current total).
+
+Collections: `accounts`, `account-balances`, `employers`, `events`,
 `transactions`, `interactions`, `individuals`, `individual-states`.
 
 | Collection | ID field |
@@ -26,41 +73,38 @@ One of: `accounts`, `account-balances`, `employers`, `events`,
 | individuals | individual_id |
 | individual-states | individual_id |
 
-## Endpoints
+Never confuse `account_id` and `individual_id` - always look up an account
+first if you only have an `account_id`, to find its `individual_id`.
 
-- `GET /api/v1/{collection}?limit=&offset=&run_id=&period=&individual_id=&account_id=`
-  → `{"collection", "total", "offset", "limit", "items": [...]}`
-- `GET /api/v1/{collection}/{item_id}?run_id=`
-  → a single item, or `{"items": [...]}` if multiple periods match
-  (e.g. account-balances over time).
+## Compliance rules the agent must apply
 
-## Key fields per collection
-
-- **individuals**: individual_id, run_id, period, income_chf, employer_id,
-  marital_status, household_id, education_level, employment.
-- **individual-states**: individual_id, run_id, birth_period, sex,
-  death_period, attributes (age, canton, plz, city, products[],
-  interests{}, values{}, bigfive{}, risk_appetite, wallet_share,
-  health_score, life_sat, stress, owns_property, mortgage_*, ...).
-  This is the richest source of customer profile data.
-- **accounts**: account_id, run_id, individual_id, kind, opened_period,
-  closed_period, product_name.
-- **account-balances**: account_id, run_id, period, balance_chf.
-- **transactions**: txn_id, run_id, account_id, period, amount_chf,
-  category, source_event, day_of_month.
-- **interactions**: interaction_id, run_id, individual_id, period, type,
-  channel, direction, category, subject, priority, status, resolution,
-  product, stage, probability, expected_value, generated_by. This is the
-  main source of past NBA-relevant advisor interactions — useful both as
-  input context and as ground truth for evaluation.
-- **events**: event_id, run_id, individual_id, counterparty, period, type,
-  effects, generated_by.
-- **employers**: employer_id, run_id, sector, region, size_band.
+- **No duplicate products**: never propose a product the customer already
+  holds. Check `has_savings`/`has_checking`/`has_pillar3a`/`unique_products`
+  (and the `accounts` list) before suggesting `offer_savings_account`,
+  `offer_pillar3a` or `offer_mortgage`.
+- **Jugendschutz (minors, age < 18)**: minors have limited legal capacity
+  and need parental/legal-guardian consent for binding financial products.
+  Only youth-appropriate actions are allowed (e.g. a youth savings account
+  or `financial_advice`); never `offer_mortgage`, `offer_investment`,
+  `offer_pillar3a`, `upsell_premium` or `retirement_planning`. If `age` is
+  missing, treat the customer cautiously rather than assuming adulthood.
+- **Regulatory checks**: `offer_investment` requires no negative balances
+  and no distress signals (suitability/Eignungsprüfung); `offer_mortgage`
+  requires evidence of affordability (Verschuldungsprüfung) - negative
+  balances or retention signals disqualify it. Never fabricate customer
+  facts; flag missing key data (age, income, employment) instead of
+  guessing. All output remains a non-binding suggestion subject to the
+  bank's formal advisory/compliance process.
 
 ## Typical NBA evaluation workflow
 
-1. Look up the individual's profile via `individuals` + `individual-states`.
-2. Gather their `accounts`, recent `transactions`, and `interactions`
-   history for context.
-3. Recommend the next best action (e.g. an offer/product or advisory
-   action), grounded only in the retrieved data.
+1. Check `/health` or `/api/status` once per session.
+2. Load `get_customer_features(individual_id)`. If not found, report this
+   clearly instead of guessing.
+3. Optionally validate accounts/products via `list_collection("accounts",
+   individual_id=...)` for extra evidence.
+4. Load `get_recommendations(individual_id)`.
+5. Select the top 1-3 recommendations by score and explain each with its
+   `reasons`, grounded only in retrieved data. Missing data must never be
+   treated as a negative fact (e.g. no interactions found ≠ "no interest").
+

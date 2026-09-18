@@ -22,14 +22,26 @@ class BackendClient:
         self.timeout = timeout
 
     def _get(self, path: str, params: dict | None = None) -> dict:
-        response = requests.get(f"{self.base_url}{path}", params=params, timeout=self.timeout)
+        try:
+            response = requests.get(f"{self.base_url}{path}", params=params, timeout=self.timeout)
+        except requests.exceptions.Timeout:
+            return {"error": "timeout", "detail": f"Request to {path} timed out after {self.timeout}s"}
+        except requests.exceptions.ConnectionError as exc:
+            return {"error": "connection_error", "detail": str(exc)}
+
         if response.status_code == 404:
             return response.json()  # e.g. {"detail": "Item not found"}
-        response.raise_for_status()
+        try:
+            response.raise_for_status()
+        except requests.exceptions.HTTPError as exc:
+            return {"error": "http_error", "status_code": response.status_code, "detail": str(exc)}
         return response.json()
 
     def health(self) -> dict:
         return self._get("/health")
+
+    def status(self) -> dict:
+        return self._get("/api/status")
 
     def list_collection(
         self,
@@ -59,3 +71,9 @@ class BackendClient:
             raise ValueError(f"Unknown collection: {collection}")
         params = {"run_id": run_id} if run_id else None
         return self._get(f"/api/v1/{collection}/{item_id}", params=params)
+
+    def get_customer_features(self, individual_id: str) -> dict:
+        return self._get(f"/api/v1/individuals/{individual_id}/features")
+
+    def get_recommendations(self, individual_id: str) -> dict:
+        return self._get(f"/api/v1/individuals/{individual_id}/recommendations")
