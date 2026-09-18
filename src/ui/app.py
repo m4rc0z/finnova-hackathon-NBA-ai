@@ -209,6 +209,17 @@ def render_portfolio_view(service: NBAService, provider: str, backend_url: str):
                 if "raw_response" in cached_nba:
                     st.text_area("Agent Response", cached_nba["raw_response"], height=100)
 
+                st.markdown("---")
+                feedback = service.get_feedback(selected_id)
+                fb_label_col, fb_good_col, fb_bad_col = st.columns([2, 1, 1])
+                fb_label_col.caption(f"Feedback: {feedback or 'not rated yet'}")
+                if fb_good_col.button("👍 Good", key=f"fb_good_{selected_id}"):
+                    service.record_feedback(selected_id, "good")
+                    st.rerun()
+                if fb_bad_col.button("👎 Bad", key=f"fb_bad_{selected_id}"):
+                    service.record_feedback(selected_id, "bad")
+                    st.rerun()
+
         # Context Details (Individual State, Accounts, Balances, Advisor Interactions)
         with st.expander("📊 View Individual Data (State, Accounts, Interactions)", expanded=False):
             with st.spinner("Fetching full individual context..."):

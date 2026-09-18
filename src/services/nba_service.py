@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import json
 import logging
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 from langchain.agents import create_agent
@@ -13,6 +16,8 @@ from src.clients.llm_client import get_llm
 from src.tools.backend_tools import BACKEND_TOOLS, set_backend_base_url
 
 logger = logging.getLogger(__name__)
+
+FEEDBACK_LOG_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "nba_feedback.jsonl"
 
 
 def _normalize_nba_result(result: dict[str, Any]) -> dict[str, Any]:
@@ -51,6 +56,7 @@ class NBAService:
             set_backend_base_url(self.client.base_url)
         self._nba_cache: dict[str, dict[str, Any]] = {}
         self._advisor_agents: dict[str, Any] = {}
+        self._feedback: dict[str, str] = {}
 
     @property
     def cache(self) -> dict[str, dict[str, Any]]:
@@ -67,6 +73,28 @@ class NBAService:
 
     def get_evaluated_count(self) -> int:
         return len(self._nba_cache)
+
+    def get_feedback(self, individual_id: str) -> str | None:
+        return self._feedback.get(individual_id)
+
+    def record_feedback(self, individual_id: str, feedback: str) -> None:
+        """Record 'good'/'bad' advisor feedback for the cached NBA result and
+        append it to a local JSONL log for later review."""
+        if feedback not in ("good", "bad"):
+            raise ValueError(f"Unknown feedback value: {feedback!r}")
+        self._feedback[individual_id] = feedback
+        entry = {
+            "individual_id": individual_id,
+            "feedback": feedback,
+            "recommendation": self._nba_cache.get(individual_id),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+        try:
+            FEEDBACK_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+            with open(FEEDBACK_LOG_PATH, "a") as f:
+                f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+        except OSError as err:
+            logger.warning(f"Failed to persist NBA feedback: {err}")
 
     def list_individuals(self, limit: int = 50, offset: int = 0) -> list[dict[str, Any]]:
         """List individuals and enrich them with their latest individual-state attributes."""
