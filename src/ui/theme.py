@@ -178,6 +178,21 @@ div[data-testid="stVerticalBlockBorderWrapper"] {
     font-size: 0.8rem;
     font-weight: 500;
 }
+.alpha-feedback-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+.alpha-feedback-badge.useful {
+    background-color: rgba(110, 231, 183, 0.15);
+    color: #6EE7B7;
+}
+.alpha-feedback-badge.dismissed {
+    background-color: rgba(160, 172, 192, 0.15);
+    color: var(--alpha-text-muted);
+}
 .alpha-eyebrow {
     text-transform: uppercase;
     letter-spacing: 0.08em;

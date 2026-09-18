@@ -243,40 +243,46 @@ def render_portfolio_view(service: NBAService, provider: str, backend_url: str):
                 with st.spinner(f"Evaluating Next Best Action for individual {selected_id}..."):
                     try:
                         service.evaluate_nba(selected_id, provider=provider, force_refresh=True)
-                        st.success("Evaluation complete!")
                     except Exception as e:
                         st.error(f"Evaluation failed: {e}")
         with status_col:
             if service.is_evaluated(selected_id):
-                st.info("Status: Evaluated & cached")
+                st.caption("Status: Evaluated & cached")
 
-        # Display NBA Result Card if available
+        # Display NBA Result Card if available, styled like the source app's insight cards
         cached_nba = service.get_cached_nba(selected_id)
         if cached_nba:
-            st.markdown("#### 🎯 Next Best Action")
             with st.container(border=True):
-                badge_col, action_display_col, confidence_display_col = st.columns([1, 2, 1])
+                badge_col, id_col, confidence_col = st.columns([1, 3, 1])
                 badge_col.markdown('<span class="alpha-badge">opportunity</span>', unsafe_allow_html=True)
-                action_display_col.markdown(f"### **{cached_nba.get('recommended_action', 'N/A')}**")
+                id_col.markdown(f'<span class="alpha-eyebrow">{selected_id}</span>', unsafe_allow_html=True)
                 confidence_score = cached_nba.get("confidence")
                 if confidence_score is not None:
-                    confidence_display_col.metric("Confidence", format_confidence(confidence_score))
+                    confidence_col.metric("Confidence", format_confidence(confidence_score))
 
-                st.markdown(f"**Reasoning:** {cached_nba.get('reasoning', 'No reasoning provided.')}")
+                st.markdown(f"### {cached_nba.get('recommended_action', 'N/A')}")
+                st.markdown("---")
+                st.markdown(f"**Suggested next step**  \n{cached_nba.get('reasoning', 'No reasoning provided.')}")
                 if "raw_response" in cached_nba:
-                    st.text_area("Agent Response", cached_nba["raw_response"], height=100)
+                    with st.expander("Why am I seeing this?"):
+                        st.text_area("Agent Response", cached_nba["raw_response"], height=100)
 
                 st.markdown("---")
                 feedback = service.get_feedback(selected_id)
                 fb_useful_col, fb_dismiss_col, fb_label_col = st.columns([1, 1, 3])
-                useful_label = "✓ Useful" if feedback != "useful" else "✓ Useful ✓"
-                if fb_useful_col.button(useful_label, key=f"fb_useful_{selected_id}"):
+                if fb_useful_col.button("✓ Useful", key=f"fb_useful_{selected_id}", type="primary" if feedback == "useful" else "secondary"):
                     service.record_feedback(selected_id, "useful")
                     st.rerun()
-                if fb_dismiss_col.button("Dismiss", key=f"fb_dismiss_{selected_id}"):
+                if fb_dismiss_col.button("Dismiss", key=f"fb_dismiss_{selected_id}", type="primary" if feedback == "dismissed" else "secondary"):
                     service.record_feedback(selected_id, "dismissed")
                     st.rerun()
-                fb_label_col.caption(f"Feedback: {feedback or 'not rated yet'}")
+                if feedback == "useful":
+                    fb_label_col.markdown('<span class="alpha-feedback-badge useful">✓ Marked useful</span>', unsafe_allow_html=True)
+                elif feedback == "dismissed":
+                    fb_label_col.markdown('<span class="alpha-feedback-badge dismissed">✕ Dismissed</span>', unsafe_allow_html=True)
+                else:
+                    fb_label_col.caption("Feedback: not rated yet")
+
 
         # Context Details (Individual State, Accounts, Balances, Advisor Interactions)
         with st.expander("📊 View Individual Data (State, Accounts, Interactions)", expanded=False):
