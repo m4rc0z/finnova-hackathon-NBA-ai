@@ -61,6 +61,7 @@ _NAV_ICON_PATHS = {
     "governance": "M12 3l8 3v6c0 5-8 9-8 9s-8-4-8-9V6zM8 12l3 3 5-6",
     "assistant": "M21 11a8 8 0 0 1-8 8H6l-4 3 1.5-6A8 8 0 1 1 21 11M7 11h.01M12 11h.01M17 11h.01",
     "preferences": "M9 3h6l1 3 3 1 2 5-2 5-3 1-1 3H9l-1-3-3-1-2-5 2-5 3-1zM16 12a4 4 0 1 1-8 0 4 4 0 0 1 8 0",
+    "search": "M21 21l-5-5M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0",
 }
 
 
@@ -267,14 +268,15 @@ def render_portfolio_view(service: NBAService, provider: str, backend_url: str):
 
                 st.markdown("---")
                 feedback = service.get_feedback(selected_id)
-                fb_label_col, fb_good_col, fb_bad_col = st.columns([2, 1, 1])
+                fb_useful_col, fb_dismiss_col, fb_label_col = st.columns([1, 1, 3])
+                useful_label = "✓ Useful" if feedback != "useful" else "✓ Useful ✓"
+                if fb_useful_col.button(useful_label, key=f"fb_useful_{selected_id}"):
+                    service.record_feedback(selected_id, "useful")
+                    st.rerun()
+                if fb_dismiss_col.button("Dismiss", key=f"fb_dismiss_{selected_id}"):
+                    service.record_feedback(selected_id, "dismissed")
+                    st.rerun()
                 fb_label_col.caption(f"Feedback: {feedback or 'not rated yet'}")
-                if fb_good_col.button("👍 Good", key=f"fb_good_{selected_id}"):
-                    service.record_feedback(selected_id, "good")
-                    st.rerun()
-                if fb_bad_col.button("👎 Bad", key=f"fb_bad_{selected_id}"):
-                    service.record_feedback(selected_id, "bad")
-                    st.rerun()
 
         # Context Details (Individual State, Accounts, Balances, Advisor Interactions)
         with st.expander("📊 View Individual Data (State, Accounts, Interactions)", expanded=False):
@@ -379,11 +381,48 @@ def render_ask_alpha_fab(service: NBAService, provider: str):
             render_ask_alpha_dialog(service, provider)
 
 
+def render_header():
+    """Top breadcrumb/user bar, mirrors the source Alpha app's header."""
+    search_icon = _nav_icon("search", 16)
+    st.markdown(
+        f"""
+        <div class="alpha-header">
+            <div class="alpha-header-breadcrumb">
+                <span class="alpha-breadcrumb-root">Workspace</span>
+                <span>›</span>
+                <span class="alpha-breadcrumb-current">Insights</span>
+            </div>
+            <div class="alpha-header-actions">
+                <span class="alpha-icon-btn">{search_icon} Search clients</span>
+                <div class="alpha-avatar">JO</div>
+                <div class="alpha-header-user"><strong>Your workspace</strong>Adviser · demo</div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_footer():
+    """Bottom footer, mirrors the source Alpha app's footer."""
+    st.markdown(
+        """
+        <div class="alpha-footer">
+            Alpha reimagined · Finnova hackathon 2026<br>
+            Source-backed insights · Explicit simulations · Human review
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def main():
     service, provider, backend_url = render_sidebar()
 
+    render_header()
     render_portfolio_view(service, provider, backend_url)
     render_ask_alpha_fab(service, provider)
+    render_footer()
 
 
 if __name__ == "__main__":

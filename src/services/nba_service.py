@@ -81,9 +81,9 @@ class NBAService:
         return self._feedback.get(individual_id)
 
     def record_feedback(self, individual_id: str, feedback: str) -> None:
-        """Record 'good'/'bad' advisor feedback for the cached NBA result and
-        append it to a local JSONL log for later review."""
-        if feedback not in ("good", "bad"):
+        """Record 'useful'/'dismissed' advisor feedback for the cached NBA
+        result and append it to a local JSONL log for later review."""
+        if feedback not in ("useful", "dismissed"):
             raise ValueError(f"Unknown feedback value: {feedback!r}")
         self._feedback[individual_id] = feedback
         entry = {

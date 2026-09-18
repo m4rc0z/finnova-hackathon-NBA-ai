@@ -187,6 +187,64 @@ div[data-testid="stVerticalBlockBorderWrapper"] {
 }
 hr, .alpha-divider { border-color: var(--alpha-border) !important; }
 
+/* Top header bar (breadcrumb + workspace/user area), mirrors the source app */
+.alpha-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 14px;
+    margin-bottom: 6px;
+    border-bottom: 1px solid var(--alpha-border);
+}
+.alpha-header-breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.85rem;
+}
+.alpha-header-breadcrumb .alpha-breadcrumb-root { color: var(--alpha-text-muted); }
+.alpha-header-breadcrumb .alpha-breadcrumb-current { color: #70DABA; font-weight: 700; }
+.alpha-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+.alpha-header-actions .alpha-icon-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--alpha-text-muted);
+    font-size: 0.85rem;
+    padding: 6px 10px;
+    border-radius: var(--alpha-radius-sm);
+    border: 1px solid var(--alpha-border);
+}
+.alpha-avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background-color: rgba(123, 159, 255, 0.15);
+    color: var(--alpha-accent);
+    font-size: 0.7rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.alpha-header-user { font-size: 0.75rem; color: var(--alpha-text-muted); line-height: 1.2; }
+.alpha-header-user strong { color: var(--alpha-text); display: block; font-size: 0.8rem; }
+
+/* Bottom footer, mirrors the source app */
+.alpha-footer {
+    text-align: center;
+    margin-top: 36px;
+    padding-top: 18px;
+    border-top: 1px solid var(--alpha-border);
+    color: var(--alpha-text-muted);
+    font-size: 0.75rem;
+    line-height: 1.6;
+}
+
 /* Floating "Ask Alpha" button, sticky bottom-right, mirrors the source app's FAB.
    Uses `sticky` instead of `fixed` because Streamlit's internal wrappers
    apply CSS transforms, which would otherwise break fixed positioning. */
