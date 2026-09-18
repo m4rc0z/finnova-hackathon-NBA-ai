@@ -15,6 +15,17 @@ OpenClaw-State liegt in einem persistenten Volume.
 OpenClaw benoetigt aktuell Node 24.16+ oder Node 26.1+. Das Dockerfile nutzt
 Node 26.
 
+Die Docker-Dateien liegen im Unterordner `openclaw/`. Vor allen folgenden
+Docker-Compose-Befehlen in ein Terminal wechseln:
+
+```bash
+cd openclaw
+```
+
+Die Befehle unten gehen davon aus, dass dieses Arbeitsverzeichnis aktiv bleibt.
+`COMPOSE_PROJECT_NAME` bestimmt den Namen des persistenten Docker-Volumes; bei
+einer bestehenden Installation den bisherigen Projektnamen beibehalten.
+
 ## Swisscom-Konfiguration
 
 Das mitgelieferte `openclaw.json`-Template registriert:
@@ -139,7 +150,7 @@ Sessions geloescht.
 
 ## Versionen und Updates
 
-`OPENCLAW_VERSION` ist in `.env.example` auf `2026.9.4` gepinnt. Fuer ein
+`OPENCLAW_VERSION` ist in `openclaw/.env.example` auf `2026.9.4` gepinnt. Fuer ein
 kontrolliertes Update die Version aendern, anschliessend neu bauen und starten:
 
 ```bash
