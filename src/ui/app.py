@@ -315,16 +315,23 @@ def render_chat_view(service: NBAService, provider: str):
                     st.session_state.chat_messages.append({"role": "assistant", "content": err_msg})
 
 
+@st.dialog("💬 Ask Alpha", width="large")
+def render_ask_alpha_dialog(service: NBAService, provider: str):
+    render_chat_view(service, provider)
+
+
+def render_ask_alpha_fab(service: NBAService, provider: str):
+    """Floating 'Ask Alpha' button (bottom-right) that opens the chat as a popup."""
+    with st.container(key="ask_alpha_fab"):
+        if st.button("💬 Ask Alpha", key="ask_alpha_btn"):
+            render_ask_alpha_dialog(service, provider)
+
+
 def main():
     service, provider, backend_url = render_sidebar()
 
-    tab_portfolio, tab_chat = st.tabs(["📋 Portfolio & Next Best Actions", "💬 Advisor Assistant (Chat)"])
-
-    with tab_portfolio:
-        render_portfolio_view(service, provider, backend_url)
-
-    with tab_chat:
-        render_chat_view(service, provider)
+    render_portfolio_view(service, provider, backend_url)
+    render_ask_alpha_fab(service, provider)
 
 
 if __name__ == "__main__":

@@ -25,6 +25,11 @@ html, body, [data-testid="stAppViewContainer"], [data-testid="stHeader"] {
     font-family: 'Inter', Arial, Helvetica, sans-serif !important;
 }
 
+/* Hide Streamlit's Deploy button, hamburger menu and footer branding */
+[data-testid="stToolbar"], #MainMenu, footer, [data-testid="stDecoration"] {
+    display: none !important;
+}
+
 [data-testid="stSidebar"] {
     background-color: var(--alpha-surface) !important;
     border-right: 1px solid var(--alpha-border);
@@ -105,5 +110,30 @@ div[data-testid="stVerticalBlockBorderWrapper"] {
     font-weight: 600;
 }
 hr, .alpha-divider { border-color: var(--alpha-border) !important; }
+
+/* Floating "Ask Alpha" button, sticky bottom-right, mirrors the source app's FAB.
+   Uses `sticky` instead of `fixed` because Streamlit's internal wrappers
+   apply CSS transforms, which would otherwise break fixed positioning. */
+.st-key-ask_alpha_fab {
+    position: sticky;
+    bottom: 28px;
+    z-index: 999;
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 24px;
+    pointer-events: none;
+}
+.st-key-ask_alpha_fab .stButton {
+    pointer-events: auto;
+}
+.st-key-ask_alpha_fab .stButton > button {
+    background-color: var(--alpha-accent) !important;
+    color: var(--alpha-accent-text) !important;
+    border: none !important;
+    border-radius: 999px !important;
+    padding: 12px 22px !important;
+    font-weight: 600 !important;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
 </style>
 """
