@@ -63,11 +63,20 @@ def _apply_compliance_filters(individual_id: str, result: dict) -> dict:
 
     filtered = [rec for rec in recommendations if rec.get("action") not in disallowed]
     if filtered != recommendations:
-        result["recommendations"] = filtered or [_FALLBACK_RECOMMENDATION]
-        result["summary"] = (
-            result.get("summary", "")
-            + " (Note: one or more suggestions were removed by compliance filters - Jugendschutz/duplicate product.)"
-        ).strip()
+        result["recommendations"] = filtered
+        if filtered:
+            top = filtered[0]
+            result["summary"] = (
+                f"Recommended action: {top.get('action')}"
+                + (f" ({top['product_name']})" if top.get("product_name") else "")
+                + ". Note: some suggestions were removed by compliance filters (Jugendschutz/duplicate product)."
+            )
+        else:
+            result["recommendations"] = [_FALLBACK_RECOMMENDATION]
+            result["summary"] = (
+                "No additional action recommended: existing products already cover the customer's needs, "
+                "and remaining suggestions were excluded by Jugendschutz/duplicate-product compliance filters."
+            )
     return result
 
 
