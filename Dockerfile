@@ -24,13 +24,16 @@ RUN set -eux; \
     mkdir -p /home/node/.openclaw/workspace; \
     chown -R node:node /home/node/.openclaw
 
+COPY --chown=node:node openclaw.json /opt/openclaw/openclaw.json
+COPY --chown=node:node --chmod=755 openclaw-entrypoint.sh /usr/local/bin/openclaw-entrypoint
+
 WORKDIR /home/node
 USER node
 
 EXPOSE 18789
 VOLUME ["/home/node/.openclaw"]
 
-ENTRYPOINT ["openclaw"]
+ENTRYPOINT ["/usr/local/bin/openclaw-entrypoint"]
 CMD ["gateway", "run", "--bind", "lan", "--auth", "token"]
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=45s --retries=3 \

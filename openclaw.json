@@ -1,0 +1,46 @@
+{
+  "models": {
+    "mode": "merge",
+    "providers": {
+      "swisscom": {
+        "baseUrl": "${SWISSCOM_BASE_URL}",
+        "apiKey": "${SWISSCOM_API_KEY}",
+        "api": "openai-completions",
+        "authHeader": true,
+        "timeoutSeconds": 300,
+        "models": [
+          {
+            "id": "${SWISSCOM_MODEL}",
+            "name": "Apertus 1.5 70B",
+            "reasoning": false,
+            "input": ["text"],
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0
+            }
+          }
+        ]
+      }
+    }
+  },
+  "agents": {
+    "defaults": {
+      "workspace": "/home/node/.openclaw/workspace",
+      "model": {
+        "primary": "swisscom/${SWISSCOM_MODEL}"
+      },
+      "timeoutSeconds": 600
+    }
+  },
+  "gateway": {
+    "mode": "local",
+    "port": 18789,
+    "bind": "lan",
+    "auth": {
+      "mode": "token",
+      "token": "${OPENCLAW_GATEWAY_TOKEN}"
+    }
+  }
+}
