@@ -14,6 +14,25 @@ from src.tools.backend_tools import BACKEND_TOOLS, set_backend_base_url
 
 logger = logging.getLogger(__name__)
 
+
+def _normalize_nba_result(result: dict[str, Any]) -> dict[str, Any]:
+    """Add recommended_action/confidence/reasoning aliases the UI expects,
+    derived from the agent's {recommendations, summary} output, without
+    dropping the original fields."""
+    recommendations = result.get("recommendations") or []
+    top = recommendations[0] if recommendations else None
+    if top:
+        result.setdefault("recommended_action", top.get("product_name") or top.get("action"))
+        score = top.get("score")
+        result.setdefault("confidence", round(score / 100, 2) if isinstance(score, (int, float)) else None)
+        result.setdefault("reasoning", result.get("summary") or "; ".join(top.get("reasons") or []))
+    else:
+        result.setdefault("recommended_action", "No recommendation" if result.get("status") == "ok" else result.get("status"))
+        result.setdefault("confidence", None)
+        result.setdefault("reasoning", result.get("summary", ""))
+    return result
+
+
 ADVISOR_ASSISTANT_PROMPT = """You are an intelligent Next Best Action advisor assistant for retail banking.
 Your role is to help bank advisors evaluate individuals and identify the single prioritized Next Best Action.
 
@@ -121,6 +140,7 @@ class NBAService:
         set_backend_base_url(self.client.base_url)
         agent = build_agent(provider)
         result = evaluate_individual(agent, individual_id)
+        result = _normalize_nba_result(result)
         self._nba_cache[individual_id] = result
         return result
 

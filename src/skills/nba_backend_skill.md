@@ -130,14 +130,18 @@ first if you only have an `account_id`, to find its `individual_id`.
 
 ## Compliance rules the agent must apply
 
-- **No duplicate products**: never propose a product the customer already
-  holds. Check `features.product_inventory.product_names` (exact match)
-  and `has_savings`/`has_checking`/`has_pillar3a` as a first signal, then
-  confirm against the product catalog above (e.g. don't suggest
-  `offer_pillar3a` if the customer already has any of "Säule 3a-Konto",
-  "Säule 3a Fondssparplan" or "Lebensversicherung 3a") before accepting a
-  `product_suggestions` entry or proposing `offer_savings_account`,
-  `offer_pillar3a`, `offer_investment` or `offer_mortgage`.
+- **No duplicate products**: check category-level flags first
+  (`has_savings`/`has_checking`/`has_pillar3a`/`product_inventory.has_mortgage`/
+  `has_investment`) - these are the source of truth, since
+  `product_suggestions.product_name` may propose a *different* product
+  name in the same category (e.g. suggesting "Sparkonto" for a customer
+  who already has "Sparkonto Young" - still a savings-category duplicate
+  and must be rejected). Also cross-check exact
+  `product_inventory.product_names` (e.g. don't suggest `offer_pillar3a`
+  if the customer already has any of "Säule 3a-Konto", "Säule 3a
+  Fondssparplan" or "Lebensversicherung 3a"). Reject any
+  `product_suggestions`/recommendation entry that duplicates an existing
+  product or category.
 - **Jugendschutz (minors, age < 18)**: minors have limited legal capacity
   and need parental/legal-guardian consent for binding financial products.
   Only youth-appropriate actions are allowed (e.g. a youth savings account

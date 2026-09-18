@@ -11,10 +11,65 @@ import json
 from dotenv import load_dotenv
 from langchain.agents import create_agent
 
+from src.clients.backend_client import BackendClient
 from src.clients.llm_client import get_llm
 from src.tools.backend_tools import BACKEND_TOOLS
 
 load_dotenv()
+
+# Actions that are never appropriate for minors (Jugendschutz), regardless
+# of what the LLM decided - enforced deterministically as a safety net.
+_MINOR_DISALLOWED_ACTIONS = {
+    "offer_mortgage",
+    "offer_investment",
+    "offer_pillar3a",
+    "upsell_premium",
+    "retirement_planning",
+}
+
+_FALLBACK_RECOMMENDATION = {
+    "action": "financial_advice",
+    "product_name": None,
+    "score": 0,
+    "reasons": ["No compliant action remained after applying Jugendschutz/duplicate-product filters."],
+}
+
+
+def _apply_compliance_filters(individual_id: str, result: dict) -> dict:
+    """Deterministically re-check recommendations against Jugendschutz and
+    duplicate-product rules, independent of whether the LLM applied them.
+    """
+    recommendations = result.get("recommendations")
+    if not isinstance(recommendations, list) or not recommendations:
+        return result
+
+    features = BackendClient().get_customer_features(individual_id)
+    if not isinstance(features, dict) or "age" not in features:
+        return result
+
+    is_minor = isinstance(features.get("age"), int) and features["age"] < 18
+    inventory = features.get("product_inventory") or {}
+    disallowed = set()
+    if is_minor:
+        disallowed |= _MINOR_DISALLOWED_ACTIONS
+    if features.get("has_savings"):
+        disallowed.add("offer_savings_account")
+    if features.get("has_pillar3a"):
+        disallowed.add("offer_pillar3a")
+    if inventory.get("has_mortgage"):
+        disallowed.add("offer_mortgage")
+    if inventory.get("has_investment"):
+        disallowed.add("offer_investment")
+
+    filtered = [rec for rec in recommendations if rec.get("action") not in disallowed]
+    if filtered != recommendations:
+        result["recommendations"] = filtered or [_FALLBACK_RECOMMENDATION]
+        result["summary"] = (
+            result.get("summary", "")
+            + " (Note: one or more suggestions were removed by compliance filters - Jugendschutz/duplicate product.)"
+        ).strip()
+    return result
+
 
 SYSTEM_PROMPT = """You are a Next Best Action (NBA) evaluation agent for a retail bank.
 
@@ -55,13 +110,18 @@ backend does not filter this) - you must filter those out yourself using
 the rules below.
 
 Decision rules:
-- Never recommend a product the customer already holds. Check
-  features.product_inventory.product_names (exact match) and
-  has_savings/has_checking/has_pillar3a first, then confirm against the
-  catalog above (e.g. don't propose offer_pillar3a if the customer
-  already has a "Säule 3a-Konto", "Säule 3a Fondssparplan" or
-  "Lebensversicherung 3a"); drop or replace any recommendation or
-  product_suggestion that duplicates an existing product.
+- Never recommend a product category the customer already holds - check
+  the category-level flags first (has_savings, has_checking, has_pillar3a,
+  product_inventory.has_mortgage/has_investment), NOT just an exact
+  product_name match: e.g. if has_savings is true, drop/never propose
+  offer_savings_account even if product_suggestions names a different
+  savings product ("Sparkonto" vs. the customer's existing "Sparkonto
+  Young" - same has_savings category, still a duplicate). Also cross-check
+  product_inventory.product_names for exact duplicates (e.g. don't propose
+  offer_pillar3a if the customer already has a "Säule 3a-Konto", "Säule 3a
+  Fondssparplan" or "Lebensversicherung 3a"). Drop or replace any
+  recommendation or product_suggestion that duplicates an existing
+  product/category - never include it in the final output.
 - Age 60+ or retired: prioritize retirement_planning.
 - Negative balance: consider retention_call or financial_advice first.
 - High balance with no negative balances: consider offer_investment.
@@ -82,6 +142,12 @@ Minors / Jugendschutz (customers under 18):
   execution requires consent of a parent/legal guardian.
 - If age is missing/unknown, treat the customer cautiously (do not assume
   they are an adult) and mention that age must be verified before acting.
+- If, after applying the duplicate-product and Jugendschutz filters, no
+  valid recommendation remains (e.g. a minor who already holds the
+  appropriate youth products), do not fabricate or fall back to a
+  duplicate - return financial_advice with a reason explaining that
+  existing products already cover the customer's needs and no further
+  action is required at this time.
 
 Banking-specific regulatory considerations:
 - Suitability/appropriateness check (Eignungs-/Angemessenheitsprüfung):
@@ -139,15 +205,25 @@ def build_agent(provider: str | None = None):
     return create_agent(llm, tools=BACKEND_TOOLS, system_prompt=SYSTEM_PROMPT)
 
 
+def _strip_code_fence(text: str) -> str:
+    text = text.strip()
+    if text.startswith("```"):
+        text = text.split("\n", 1)[1] if "\n" in text else text[3:]
+        if text.endswith("```"):
+            text = text.rsplit("```", 1)[0]
+    return text.strip()
+
+
 def evaluate_individual(agent, individual_id: str) -> dict:
     result = agent.invoke(
         {"messages": [{"role": "user", "content": f"Evaluate the next best action for individual_id={individual_id}."}]}
     )
     final_message = result["messages"][-1].content
     try:
-        return json.loads(final_message)
+        parsed = json.loads(_strip_code_fence(final_message))
     except json.JSONDecodeError:
         return {"individual_id": individual_id, "raw_response": final_message}
+    return _apply_compliance_filters(individual_id, parsed)
 
 
 def evaluate_dataset(individual_ids: list[str], provider: str | None = None) -> list[dict]:
