@@ -22,7 +22,7 @@ Das mitgelieferte `openclaw.json`-Template registriert:
 - Provider: `swisscom`
 - Base URL: `https://api.swisscom.com/products/swiss-ai-weeks/apertus-1.5-70b/v1`
 - API: `openai-completions`
-- Modell: `apertus-1.5-70b`
+- Modell-ID: `swiss-ai/Apertus-v1.5-70B`
 - Authentifizierung: `Authorization: Bearer <SWISSCOM_API_KEY>`
 
 Die API-Key-Datei `.env` bleibt lokal und ist von Git ausgeschlossen. Der
@@ -80,7 +80,7 @@ und ist nicht der Swisscom API-Key.
    docker compose exec openclaw openclaw health
    ```
 
-   `models list` sollte `swisscom/apertus-1.5-70b` enthalten. Eine echte
+   `models list` sollte `swisscom/swiss-ai/Apertus-v1.5-70B` enthalten. Eine echte
    Provider-Anfrage pruefst du am einfachsten mit einer Nachricht in der
    Control UI.
 
