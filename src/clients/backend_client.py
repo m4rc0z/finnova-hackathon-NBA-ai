@@ -23,6 +23,8 @@ class BackendClient:
 
     def _get(self, path: str, params: dict | None = None) -> dict:
         response = requests.get(f"{self.base_url}{path}", params=params, timeout=self.timeout)
+        if response.status_code == 404:
+            return response.json()  # e.g. {"detail": "Item not found"}
         response.raise_for_status()
         return response.json()
 
