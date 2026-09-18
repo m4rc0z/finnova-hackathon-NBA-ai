@@ -35,6 +35,82 @@ html, body, [data-testid="stAppViewContainer"], [data-testid="stHeader"] {
     border-right: 1px solid var(--alpha-border);
 }
 
+/* Sidebar nav (mirrors the source app's workspace navigation) */
+.alpha-logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 4px 0 20px 0;
+}
+.alpha-logo-badge {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    background-color: var(--alpha-accent);
+    color: var(--alpha-accent-text);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 1.1rem;
+}
+.alpha-logo-name { font-weight: 700; font-size: 1.15rem; color: var(--alpha-text); }
+.alpha-logo-by { font-size: 0.7rem; color: var(--alpha-text-muted); line-height: 1.1; }
+
+.alpha-nav-section {
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--alpha-text-muted);
+    font-size: 0.7rem;
+    font-weight: 600;
+    margin: 18px 4px 8px 4px;
+}
+.alpha-nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 12px;
+    border-radius: 10px;
+    color: var(--alpha-text-muted);
+    font-weight: 500;
+    font-size: 0.95rem;
+    margin-bottom: 2px;
+}
+.alpha-nav-item.active {
+    background-color: rgba(123, 159, 255, 0.15);
+    color: var(--alpha-accent) !important;
+    font-weight: 600;
+}
+.alpha-nav-item .alpha-nav-badge {
+    margin-left: auto;
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 6px;
+    background-color: rgba(255,255,255,0.08);
+    color: var(--alpha-text-muted);
+}
+.alpha-nav-item svg { flex-shrink: 0; }
+.alpha-workspace-card {
+    border: 1px solid var(--alpha-border);
+    border-radius: var(--alpha-radius-lg);
+    padding: 14px 16px;
+    margin-top: 24px;
+}
+.alpha-workspace-card .alpha-workspace-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #6EE7B7;
+    font-weight: 700;
+    margin-bottom: 6px;
+}
+.alpha-workspace-card .alpha-workspace-meta {
+    color: var(--alpha-text-muted);
+    font-size: 0.8rem;
+    line-height: 1.4;
+}
+
 h1, h2, h3, h4 { color: var(--alpha-text) !important; font-weight: 600 !important; }
 p, span, label, div { color: var(--alpha-text); }
 .stCaption, [data-testid="stCaptionContainer"] { color: var(--alpha-text-muted) !important; }

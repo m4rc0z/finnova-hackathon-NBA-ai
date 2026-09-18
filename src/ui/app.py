@@ -49,80 +49,132 @@ def fetch_cached_individuals(base_url: str, limit: int = 50) -> list[dict]:
     return service.list_individuals(limit=limit)
 
 
+# Inline SVG path data extracted from the reference Alpha app (Lucide-style icons, stroke-width 1.65)
+_NAV_ICON_PATHS = {
+    "overview": "M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z",
+    "clients": "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M16 3a4 4 0 0 1 0 8M22 21v-2a4 4 0 0 0-3-3.87M13 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0",
+    "my_day": "M8 2v4M16 2v4M3 9h18M5 4h14a2 2 0 0 1 2 2v14H3V6a2 2 0 0 1 2-2M7 13h3M14 13h3M7 17h3",
+    "insights": "M3 17l6-6 4 3 8-10M15 4h6v6M3 3v18h18",
+    "action_studio": "M12 3l2.4 6.6L21 12l-6.6 2.4L12 21l-2.4-6.6L3 12l6.6-2.4z",
+    "life_goals": "M21 12a9 9 0 1 1-9-9M17 3l4 0 0 4M12 12l9-9M16 12a4 4 0 1 1-4-4",
+    "roundup": "M3 8l4-4 4 4M7 4v12a4 4 0 0 0 4 4M21 16l-4 4-4-4M17 20V8a4 4 0 0 0-4-4",
+    "governance": "M12 3l8 3v6c0 5-8 9-8 9s-8-4-8-9V6zM8 12l3 3 5-6",
+    "assistant": "M21 11a8 8 0 0 1-8 8H6l-4 3 1.5-6A8 8 0 1 1 21 11M7 11h.01M12 11h.01M17 11h.01",
+    "preferences": "M9 3h6l1 3 3 1 2 5-2 5-3 1-1 3H9l-1-3-3-1-2-5 2-5 3-1zM16 12a4 4 0 1 1-8 0 4 4 0 0 1 8 0",
+}
+
+
+def _nav_icon(name: str, size: int = 18) -> str:
+    path = _NAV_ICON_PATHS[name]
+    return (
+        f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" '
+        f'stroke="currentColor" stroke-width="1.65" stroke-linecap="round" '
+        f'stroke-linejoin="round"><path d="{path}"></path></svg>'
+    )
+
+
 def render_sidebar():
-    st.sidebar.title("Finnova NBA Advisor")
-    st.sidebar.caption("Retail Banking Advisory Platform")
-
-    st.sidebar.markdown("---")
-    st.sidebar.subheader("⚙️ Connection Settings")
-
-    default_url = os.getenv("BACKEND_BASE_URL", "http://localhost:8000")
-    backend_url = st.sidebar.text_input("Backend Base URL", value=default_url)
-
-    provider = st.sidebar.selectbox(
-        "LLM Provider",
-        options=["swisscom", "openai"],
-        index=0 if os.getenv("LLM_PROVIDER", "swisscom").lower() == "swisscom" else 1,
-    )
-    os.environ["LLM_PROVIDER"] = provider
-
-    if provider == "swisscom":
-        default_sc_url = os.getenv(
-            "SWISSCOM_BASE_URL",
-            "https://api.swisscom.com/products/swiss-ai-weeks/apertus-1.5-70b/v1",
-        )
-        sc_base_url = st.sidebar.text_input(
-            "Swisscom Base URL",
-            value=default_sc_url,
-        )
-        sc_api_key = st.sidebar.text_input(
-            "Swisscom API Key",
-            value=os.getenv("SWISSCOM_API_KEY", ""),
-            type="password",
-            placeholder="Key hier einfügen...",
-        )
-        if sc_base_url:
-            os.environ["SWISSCOM_BASE_URL"] = sc_base_url
-        if sc_api_key:
-            os.environ["SWISSCOM_API_KEY"] = sc_api_key
-    elif provider == "openai":
-        oa_api_key = st.sidebar.text_input(
-            "OpenAI API Key",
-            value=os.getenv("OPENAI_API_KEY", ""),
-            type="password",
-        )
-        if oa_api_key:
-            os.environ["OPENAI_API_KEY"] = oa_api_key
-
-    service = get_service(backend_url)
-
-    # Health check button
-    if st.sidebar.button("Test Backend Connection"):
-        try:
-            health = service.client.health()
-            st.sidebar.success(f"Connected: {health.get('status', 'OK')}")
-        except Exception as e:
-            st.sidebar.error(f"Connection failed: {e}")
-
-    cached_count = service.get_evaluated_count()
-    st.sidebar.metric("Evaluated Next Best Actions", cached_count)
-
-    if st.sidebar.button("Clear NBA Cache"):
-        service.clear_cache()
-        st.sidebar.info("Cache cleared.")
-        st.rerun()
-
-    st.sidebar.markdown("---")
     st.sidebar.markdown(
-        """
-        **Domain Glossary**
-        - **Individual**: Retail banking individual
-        - **Next Best Action**: Single prioritized advisory action
-        - **Individual State**: Snapshot of attributes, risk, and situation
-        - **Advisor Interaction**: Engagement record across channels
-        - **Account Balance**: Recorded monetary balance
-        """
+        f"""
+        <div class="alpha-logo">
+            <div class="alpha-logo-badge">α</div>
+            <div>
+                <div class="alpha-logo-name">alpha</div>
+                <div class="alpha-logo-by">by finnova</div>
+            </div>
+        </div>
+        <div class="alpha-nav-section">Your workspace</div>
+        <div class="alpha-nav-item">{_nav_icon('overview')} Overview</div>
+        <div class="alpha-nav-item">{_nav_icon('clients')} Clients</div>
+        <div class="alpha-nav-item">{_nav_icon('my_day')} My day</div>
+        <div class="alpha-nav-section">Intelligence &amp; planning</div>
+        <div class="alpha-nav-item active">{_nav_icon('insights')} Insights</div>
+        <div class="alpha-nav-item">{_nav_icon('action_studio')} Action studio</div>
+        <div class="alpha-nav-item">{_nav_icon('life_goals')} Life goals</div>
+        <div class="alpha-nav-item">{_nav_icon('roundup')} Round-up investing</div>
+        <div class="alpha-nav-item">{_nav_icon('governance')} Governance</div>
+        <div class="alpha-nav-item">{_nav_icon('assistant')} Alpha assistant <span class="alpha-nav-badge">NEW</span></div>
+        """,
+        unsafe_allow_html=True,
     )
+
+    with st.sidebar.expander("Preferences", expanded=False, icon="⚙️"):
+        st.caption("Retail Banking Advisory Platform - Connection Settings")
+
+        default_url = os.getenv("BACKEND_BASE_URL", "http://localhost:8000")
+        backend_url = st.text_input("Backend Base URL", value=default_url)
+
+        provider = st.selectbox(
+            "LLM Provider",
+            options=["swisscom", "openai"],
+            index=0 if os.getenv("LLM_PROVIDER", "swisscom").lower() == "swisscom" else 1,
+        )
+        os.environ["LLM_PROVIDER"] = provider
+
+        if provider == "swisscom":
+            default_sc_url = os.getenv(
+                "SWISSCOM_BASE_URL",
+                "https://api.swisscom.com/products/swiss-ai-weeks/apertus-1.5-70b/v1",
+            )
+            sc_base_url = st.text_input("Swisscom Base URL", value=default_sc_url)
+            sc_api_key = st.text_input(
+                "Swisscom API Key",
+                value=os.getenv("SWISSCOM_API_KEY", ""),
+                type="password",
+                placeholder="Key hier einfügen...",
+            )
+            if sc_base_url:
+                os.environ["SWISSCOM_BASE_URL"] = sc_base_url
+            if sc_api_key:
+                os.environ["SWISSCOM_API_KEY"] = sc_api_key
+        elif provider == "openai":
+            oa_api_key = st.text_input(
+                "OpenAI API Key",
+                value=os.getenv("OPENAI_API_KEY", ""),
+                type="password",
+            )
+            if oa_api_key:
+                os.environ["OPENAI_API_KEY"] = oa_api_key
+
+        service = get_service(backend_url)
+
+        if st.button("Test Backend Connection"):
+            try:
+                health = service.client.health()
+                st.success(f"Connected: {health.get('status', 'OK')}")
+            except Exception as e:
+                st.error(f"Connection failed: {e}")
+
+        cached_count = service.get_evaluated_count()
+        st.metric("Evaluated Next Best Actions", cached_count)
+
+        if st.button("Clear NBA Cache"):
+            service.clear_cache()
+            st.info("Cache cleared.")
+            st.rerun()
+
+        st.markdown("---")
+        st.markdown(
+            """
+            **Domain Glossary**
+            - **Individual**: Retail banking individual
+            - **Next Best Action**: Single prioritized advisory action
+            - **Individual State**: Snapshot of attributes, risk, and situation
+            - **Advisor Interaction**: Engagement record across channels
+            - **Account Balance**: Recorded monetary balance
+            """
+        )
+
+    st.sidebar.markdown(
+        f"""
+        <div class="alpha-workspace-card">
+            <div class="alpha-workspace-title">{_nav_icon('governance', 14)} Evidence-led workspace</div>
+            <div class="alpha-workspace-meta">Hackathon demo · September 2026<br>Human decisions. Clear boundaries.</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
     return service, provider, backend_url
 
 
