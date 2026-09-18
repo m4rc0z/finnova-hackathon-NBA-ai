@@ -10,6 +10,12 @@ from src.clients.backend_client import VALID_COLLECTIONS, BackendClient
 _client = BackendClient()
 
 
+def set_backend_base_url(base_url: str) -> None:
+    """Update the backend base URL used across all backend tools."""
+    global _client
+    _client = BackendClient(base_url=base_url)
+
+
 @tool
 def list_collection(
     collection: str,
