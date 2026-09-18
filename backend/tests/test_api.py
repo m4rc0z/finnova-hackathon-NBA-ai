@@ -87,3 +87,33 @@ def test_agent_run_endpoint_execution_error(mock_run_agent):
     assert response.status_code == 400
     data = response.json()
     assert "execution failed" in data["detail"]
+
+
+def test_available_agents_endpoint():
+    """Test agent discovery for the orchestrator."""
+    response = client.get("/api/agents")
+
+    assert response.status_code == 200
+    assert "nba_creator" in response.json()["agents"]
+
+
+@patch("nba_ai.main.run_orchestrated_agent")
+def test_orchestrator_run_endpoint(mock_run_orchestrated_agent):
+    """Test delegating an agent run through the orchestrator."""
+    from nba_ai.contracts.nba import NBAProposal
+
+    mock_run_orchestrated_agent.return_value = NBAProposal(
+        name="Orchestrated NBA",
+        objective="Test objective",
+        explanation="Test explanation",
+    )
+
+    response = client.post(
+        "/api/orchestrator/run",
+        json={"agent_name": "nba_creator", "input": "Test input"},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["agent_name"] == "nba_creator"
+    assert data["output"]["name"] == "Orchestrated NBA"

@@ -9,6 +9,7 @@ A minimal, production-ready Python agent runtime for **Next Best Action Studio**
 - ✅ Example Agent (`nba_creator`) with structured output
 - ✅ Example Tool (`get_available_client_attributes`) demonstrating tool calling
 - ✅ FastAPI HTTP endpoints (health + agent execution)
+- ✅ Registered-agent orchestrator (discovery + delegation)
 - ✅ Pydantic v2 contracts for structured outputs
 - ✅ 18 unit tests (no external API dependencies)
 - ✅ Docker support (ready to deploy)
@@ -59,7 +60,7 @@ def run_agent(agent_name: str, input_text: str, settings: Settings) -> Any:
     agent = agent_factory()
     runner = AgentRunner()
     result = runner.run_sync(starting_agent=agent, input=input_text)
-    return result.output
+    return result.final_output
 ```
 
 **Why**:
@@ -72,7 +73,32 @@ def run_agent(agent_name: str, input_text: str, settings: Settings) -> Any:
 
 ---
 
-### 3. Using OpenAI Agents SDK (Not Custom Loop)
+### 3. Registered-Agent Orchestrator
+
+**Decision**: Add a deterministic orchestration boundary instead of an LLM
+supervisor.
+
+```python
+# services/agent_orchestrator.py
+agents = list_available_agents()
+output = run_orchestrated_agent("nba_creator", input_text, settings)
+```
+
+**Why**:
+- Agent discovery and selection are separate from HTTP
+- Unknown agent names are rejected before execution
+- It works with the current Swisscom/Apertus tool limitations
+- A future supervisor or OpenClaw/MCP adapter can call this boundary
+
+**Not included yet**:
+- Dynamic agent code generation
+- Agent persistence
+- Handoffs or multi-agent loops
+- LLM-based planning
+
+---
+
+### 4. Using OpenAI Agents SDK (Not Custom Loop)
 
 **Decision**: Use `agents.Agent` and `AgentRunner.run_sync()` directly.
 
@@ -104,7 +130,7 @@ result = runner.run_sync(starting_agent=agent, input="...")
 
 ---
 
-### 4. Structured Output via Pydantic
+### 5. Structured Output via Pydantic
 
 **Decision**: Each agent declares `output_type: type[NBAProposal]`.
 
@@ -130,7 +156,7 @@ agent = Agent(
 
 ---
 
-### 5. Tool Calling with Function Tools
+### 6. Tool Calling with Function Tools
 
 **Decision**: Wrap functions with `@function_tool` decorator.
 
@@ -158,14 +184,14 @@ agent = Agent(
 
 ---
 
-### 6. Synchronous Agent Execution
+### 7. Synchronous Agent Execution
 
 **Decision**: `run_agent()` is **synchronous** (uses `runner.run_sync()`), not async.
 
 ```python
 def run_agent(...) -> Any:  # NOT async
     result = runner.run_sync(...)  # Sync call
-    return result.output
+    return result.final_output
 ```
 
 **Why**:
@@ -178,7 +204,7 @@ def run_agent(...) -> Any:  # NOT async
 
 ---
 
-### 7. Tests Without API Keys
+### 8. Tests Without API Keys
 
 **Decision**: All tests mock `run_agent()` or `AgentRunner`.
 
@@ -200,7 +226,7 @@ def test_agent_run_endpoint_success(mock_run_agent):
 
 ---
 
-### 8. Minimal FastAPI Endpoints
+### 9. Minimal FastAPI Endpoints
 
 **Decision**: Only `/health` and `/api/agents/{agent_name}/run`.
 
@@ -311,6 +337,8 @@ def mcp_tool_nba_agents(agent_name: str, input_text: str) -> dict:
 
 ```
 main.py (FastAPI)
+  ├─ services/agent_orchestrator.py
+  │    └─ services/agent_runtime.py (run_agent)
   └─ services/agent_runtime.py (run_agent)
        └─ agents/registry.py (get_agent)
             └─ agents/nba_creator.py (create_nba_creator_agent)
@@ -339,7 +367,7 @@ main.py (FastAPI)
 | **Integration** | Integration tests | Mock run_agent() |
 | **Smoke** | Manual/CI | Real LLM (optional) |
 
-**Total**: 18 passed tests, 2 optional smoke tests.
+**Total**: 24 automated tests, 2 optional smoke tests.
 
 ---
 
@@ -347,7 +375,7 @@ main.py (FastAPI)
 
 - **Agent creation**: O(1) factory lookup + instantiation (~1ms)
 - **Tool execution**: Depends on tool impl (get_available_client_attributes is instant)
-- **LLM call**: Dominates (typically 2-5 seconds for gpt-4o-mini)
+- **LLM call**: Dominates (typically a few seconds for the configured Swisscom model)
 - **Structured parsing**: Pydantic validation (~10ms)
 
 **Bottleneck**: LLM latency, not agent runtime.
@@ -376,9 +404,9 @@ main.py (FastAPI)
    - Today: `run_sync()` is fine
    - Future: Could add `run_agent_async()` if needed
 
-2. **Agent Chaining**: Should agents call other agents?
-   - Today: OpenClaw handles this
-   - Future: Could add agent-to-agent calls if needed
+2. **LLM-based orchestration**: Should a model plan multi-agent workflows?
+   - Today: The orchestrator delegates one registered agent per request
+   - Future: Add a supervisor only when a model with reliable tool calling is available
 
 3. **Tool Context**: Do tools need access to agent/conversation state?
    - Today: Tools receive only their parameters

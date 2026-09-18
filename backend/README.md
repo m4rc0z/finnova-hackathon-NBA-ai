@@ -39,6 +39,14 @@ curl http://localhost:8000/health
 curl -X POST http://localhost:8000/api/agents/nba_creator/run \
   -H "Content-Type: application/json" \
   -d '{"input": "Analyze client Acme Corp and recommend next best actions"}'
+
+# Discover agents managed by the orchestrator
+curl http://localhost:8000/api/agents
+
+# Run an agent through the orchestrator boundary
+curl -X POST http://localhost:8000/api/orchestrator/run \
+  -H "Content-Type: application/json" \
+  -d '{"agent_name":"nba_creator","input":"Recommend a next best action for Acme Corp"}'
 ```
 
 ### Running Tests
@@ -100,7 +108,8 @@ backend/
 │   │   └── client_attrs.py      # Example tool: get_available_client_attributes()
 │   │
 │   └── services/
-│       └── agent_runtime.py     # run_agent() boundary layer
+│       ├── agent_runtime.py     # run_agent() execution boundary
+│       └── agent_orchestrator.py # discovery + delegation boundary
 │
 └── tests/                        # Unit tests (no API calls)
     ├── test_api.py              # FastAPI endpoints
@@ -108,6 +117,7 @@ backend/
     ├── test_registry.py         # Agent registry
     ├── test_tools.py            # Tool definitions
     ├── test_contracts.py        # Pydantic models
+    ├── test_orchestrator.py     # Orchestrator delegation
     └── conftest.py              # Pytest fixtures
 ```
 
@@ -120,25 +130,30 @@ backend/
 
 2. **Agent Runtime as Service Boundary**
    - `run_agent(agent_name, input, settings)` is the main entry point
-   - Later, OpenClaw/MCP will call this function to orchestrate agents
+   - The orchestrator delegates to this function
    - Keeps HTTP handlers clean and testable
 
-3. **No Agent Loop Re-implementation**
+3. **Deterministic Orchestrator**
+   - `agent_orchestrator.py` lists registered agents and delegates selected runs
+   - It does not generate Python code, persist agents, or run a supervisor loop
+   - This keeps the first orchestration increment compatible with Swisscom Apertus
+
+4. **No Agent Loop Re-implementation**
    - Uses OpenAI Agents SDK's `AgentRunner.run_sync()`
    - Agents are declarative (instructions, tools, output_type)
    - SDK handles model calls, tool execution, retries
 
-4. **Structured Output via Pydantic**
+5. **Structured Output via Pydantic**
    - Each agent declares its `output_type` (e.g., `NBAProposal`)
    - LLM response is automatically parsed into the Pydantic model
    - No manual JSON parsing
 
-5. **Tool Calling with Function Tools**
+6. **Tool Calling with Function Tools**
    - Tools wrapped with `@function_tool` decorator
    - SDK automatically exposes them to the LLM
    - Agent decides when and how to use tools
 
-6. **Tests Without API Calls**
+7. **Tests Without API Calls**
    - All tests mock the LLM/runner
    - No test dependency on real OpenAI API
    - CI can run tests without secrets
@@ -217,7 +232,7 @@ agent can produce a concrete response when Apertus does not emit a tool call.
 When OpenClaw is integrated later:
 
 1. **Agent Orchestration**
-   - OpenClaw calls `run_agent(agent_name, input, settings)`
+   - OpenClaw can call `run_orchestrated_agent(agent_name, input, settings)`
    - Receives structured output (e.g., `NBAProposal`)
    - No need to change agent implementations
 
