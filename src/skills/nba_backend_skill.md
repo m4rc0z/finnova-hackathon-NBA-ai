@@ -15,6 +15,30 @@ unreachable; the client handles timeouts/HTTP errors and returns an
 
 - `GET /health`, `GET /api/status` → `{"status": "ok", "data": "loaded"|"loading"}`
 
+## Product catalog
+
+`accounts.product_name` holds the concrete product a customer already
+owns; `accounts.kind` is its category. Use exact `product_name` matches
+(not just the category) to detect duplicates before recommending an
+action - e.g. don't propose `offer_pillar3a` if the customer already has
+a "Säule 3a-Konto" *or* a "Säule 3a Fondssparplan" *or* a
+"Lebensversicherung 3a".
+
+| `kind` | Products (`product_name`) | Related action |
+|---|---|---|
+| checking | Privatkonto, Jugendkonto, Geschaeftskonto * | (base account, not an "offer") |
+| savings | Sparkonto, Sparkonto Young, Jugendsparkonto, Anlagesparkonto | `offer_savings_account` |
+| pillar3a | Säule 3a-Konto, Säule 3a Fondssparplan, Lebensversicherung 3a | `offer_pillar3a` |
+| investment | Anlagekonto, Fondssparplan, Wertschriftendepot | `offer_investment` |
+| mortgage | Festhypothek | `offer_mortgage` |
+| credit_card | Kreditkarte Visa/Mastercard | `upsell_premium` |
+| insurance | Rechtsschutzversicherung | `upsell_premium` / `financial_advice` |
+| - | Freizügigkeitskonto (vested benefits / 2nd-pillar account) | `retirement_planning` |
+
+`Jugendkonto`/`Jugendsparkonto`/`Sparkonto Young` are the youth-appropriate
+products - these are the only savings-type products to consider for
+minors (see Jugendschutz rule below).
+
 ## Customer features (preferred for analysis)
 
 `GET /api/v1/individuals/{individual_id}/features` →
@@ -80,8 +104,12 @@ first if you only have an `account_id`, to find its `individual_id`.
 
 - **No duplicate products**: never propose a product the customer already
   holds. Check `has_savings`/`has_checking`/`has_pillar3a`/`unique_products`
-  (and the `accounts` list) before suggesting `offer_savings_account`,
-  `offer_pillar3a` or `offer_mortgage`.
+  as a first signal, then confirm against the exact `accounts.product_name`
+  values from the product catalog above (e.g. don't suggest
+  `offer_pillar3a` if the customer already has any of "Säule 3a-Konto",
+  "Säule 3a Fondssparplan" or "Lebensversicherung 3a") before suggesting
+  `offer_savings_account`, `offer_pillar3a`, `offer_investment` or
+  `offer_mortgage`.
 - **Jugendschutz (minors, age < 18)**: minors have limited legal capacity
   and need parental/legal-guardian consent for binding financial products.
   Only youth-appropriate actions are allowed (e.g. a youth savings account
