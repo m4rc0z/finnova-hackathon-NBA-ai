@@ -15,13 +15,15 @@ import streamlit as st
 from src.clients.backend_client import BackendClient
 from src.services.nba_service import NBAService
 from src.tools.backend_tools import set_backend_base_url
+from src.ui.theme import CUSTOM_CSS
 
 st.set_page_config(
-    page_title="Finnova - Next Best Action Advisor",
+    page_title="Alpha - Next Best Action Advisor",
     page_icon="🏦",
     layout="wide",
     initial_sidebar_state="expanded",
 )
+st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
 
 def format_confidence(confidence: float | None) -> str:
@@ -125,6 +127,7 @@ def render_sidebar():
 
 
 def render_portfolio_view(service: NBAService, provider: str, backend_url: str):
+    st.markdown('<div class="alpha-eyebrow">FROM DATA TO DIALOGUE</div>', unsafe_allow_html=True)
     st.subheader("📋 Individuals Portfolio & Next Best Actions")
     st.caption("View individuals, demographic attributes, and on-demand Next Best Actions.")
 
@@ -199,7 +202,8 @@ def render_portfolio_view(service: NBAService, provider: str, backend_url: str):
         if cached_nba:
             st.markdown("#### 🎯 Next Best Action")
             with st.container(border=True):
-                action_display_col, confidence_display_col = st.columns([3, 1])
+                badge_col, action_display_col, confidence_display_col = st.columns([1, 2, 1])
+                badge_col.markdown('<span class="alpha-badge">opportunity</span>', unsafe_allow_html=True)
                 action_display_col.markdown(f"### **{cached_nba.get('recommended_action', 'N/A')}**")
                 confidence_score = cached_nba.get("confidence")
                 if confidence_score is not None:

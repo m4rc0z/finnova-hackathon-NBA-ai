@@ -27,7 +27,10 @@ def _normalize_nba_result(result: dict[str, Any]) -> dict[str, Any]:
     recommendations = result.get("recommendations") or []
     top = recommendations[0] if recommendations else None
     if top:
-        result.setdefault("recommended_action", top.get("product_name") or top.get("action"))
+        product_name = top.get("product_name")
+        if not product_name or str(product_name).strip().lower() in ("n/a", "none", "null"):
+            product_name = None
+        result.setdefault("recommended_action", product_name or top.get("action"))
         score = top.get("score")
         result.setdefault("confidence", round(score / 100, 2) if isinstance(score, (int, float)) else None)
         result.setdefault("reasoning", result.get("summary") or "; ".join(top.get("reasons") or []))
